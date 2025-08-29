@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
+const fetch = require('node-fetch'); // Precisamos importar o fetch para o ping
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -20,7 +21,6 @@ cloudinary.config({
 });
 
 // --- CONFIGURAÇÃO DO MULTER ---
-// Usaremos armazenamento em memória para processar o upload
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
@@ -37,19 +37,22 @@ const memberSchema = new mongoose.Schema({
   endereco: String,
   telefone: String,
   cargo: { type: String, required: true },
-  foto: String, // Agora vai armazenar a URL do Cloudinary
+  foto: String,
 });
 const Member = mongoose.model('Member', memberSchema);
 
 // --- ROTAS DA API ---
 
-// NOVA ROTA PARA UPLOAD DE IMAGEM
+// ROTA PARA O AUTO-PING
+app.get('/ping', (req, res) => {
+  res.status(200).send('Ping recebido com sucesso!');
+});
+
+// ROTA PARA UPLOAD DE IMAGEM
 app.post('/upload', upload.single('file'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
   }
-
-  // Envia o buffer da imagem para o Cloudinary
   cloudinary.uploader.upload_stream({ resource_type: 'auto' }, (error, result) => {
     if (error) {
       console.error('Erro no upload para o Cloudinary:', error);
@@ -59,8 +62,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
   }).end(req.file.buffer);
 });
 
-
-// Rotas existentes (sem alteração na lógica, apenas no que o campo 'foto' representa)
+// Rotas de membros
 app.get('/members', async (req, res) => {
   try {
     const members = await Member.find().sort({ nome: 1 });
@@ -107,3 +109,13 @@ app.delete('/members/:id', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
+// --- LÓGICA DO AUTO-PING ---
+const PING_URL = "https://back-end-mulheres-renovadas.onrender.com/ping";
+const PING_INTERVAL = 5 * 60 * 1000; // 5 minutos
+
+setInterval(() => {
+  fetch(PING_URL)
+    .then(res => console.log(`Ping enviado, status: ${res.status}`))
+    .catch(err => console.error("Erro ao enviar ping:", err));
+}, PING_INTERVAL);
